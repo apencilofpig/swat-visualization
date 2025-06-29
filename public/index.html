@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SWaT 高级仪表盘</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head><body>
+    <header>
+        <h1>SWaT 智能水处理高级仪表盘</h1>
+        <!-- 时间和播放控制 -->
+        <div id="controls">
+            <button id="play-pause-btn" title="播放/暂停"><i class="fas fa-play"></i></button>
+            <select id="speed-control" title="播放速度">
+                <option value="0.5">0.5x</option>
+                <option value="1" selected>1x (实时)</option>
+                <option value="1.5">1.5x</option>
+                <option value="2">2x</option>
+            </select>
+            <input type="range" id="time-slider" min="0" value="0" title="时间轴">
+            <span id="timestamp-display">正在加载...</span>
+            <div class="time-input-container">
+                <input type="datetime-local" id="manual-time-input" step="1">
+                <button id="jump-to-time-btn" title="跳转到指定时间">跳转</button>
+            </div>
+            <button id="filter-btn" title="筛选设备"><i class="fas fa-filter"></i> 筛选</button>
+        </div>
+        <!-- 攻击信息显示 -->
+        <div id="attack-display">
+            <strong>状态:</strong> 
+            <span id="attack-status">正常</span>
+            <span id="attack-info-wrapper" style="display: none;">
+                | <strong>攻击ID:</strong> <span id="attack-id"></span>
+                | <strong>详情:</strong> <span id="attack-details"></span>
+            </span>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+        <!-- 各个阶段和设备将由 app.js 动态生成 -->
+    </main>
+
+    <!-- 设备筛选模态框 -->
+    <div id="filter-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>筛选设备</h2>
+                <button id="close-modal-btn" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body" id="filter-options">
+                <!-- 筛选复选框将由 app.js 动态生成 -->
+            </div>
+            <div class="modal-footer">
+                <button id="filter-apply-btn">应用</button>
+                <button id="filter-select-all-btn">全选</button>
+                <button id="filter-deselect-all-btn">全不选</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

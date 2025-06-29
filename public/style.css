@@ -1,0 +1,121 @@
+/* public/style.css (v5) */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+
+:root {
+    --bg-color: #f4f6f9;
+    --card-bg: #ffffff;
+    --text-primary: #212529;
+    --text-secondary: #6c757d;
+    --border-color: #dee2e6;
+    --accent-color: #007bff;
+    --green: #28a745;
+    --red: #dc3545;
+    --orange: #fd7e14;
+    --blue: #17a2b8;
+    --shadow: 0 2px 4px rgba(0,0,0,0.07);
+}
+
+body {
+    font-family: 'Noto Sans SC', sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+header {
+    background-color: var(--card-bg);
+    padding: 12px 20px;
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+h1 { text-align: center; color: var(--accent-color); font-weight: 500; font-size: 22px; margin: 0 0 12px; }
+#controls { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+#play-pause-btn { background: none; border: 1px solid #ccc; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: 14px; color: var(--text-secondary); transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; }
+#play-pause-btn:hover { background-color: #e9ecef; }
+#speed-control { padding: 6px; border: 1px solid #ccc; border-radius: 4px; background-color: white; }
+#time-slider { flex-grow: 1; max-width: 500px; }
+.time-input-container { display: flex; }
+#manual-time-input { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px 0 0 4px; font-size: 13px; }
+#jump-to-time-btn, #filter-btn { padding: 6px 12px; border: 1px solid var(--accent-color); background-color: var(--accent-color); color: white; cursor: pointer; }
+#jump-to-time-btn { border-radius: 0 4px 4px 0; border-left: none; }
+#filter-btn { border-radius: 4px; }
+#attack-display { text-align: center; margin: 10px auto 0; padding: 6px 12px; border-radius: 4px; background-color: #f8f9fa; border: 1px solid var(--border-color); max-width: 95%; }
+#attack-status.attack { color: var(--red); font-weight: bold; }
+
+/* Dynamic stage card layout */
+.dashboard-container { 
+    display: flex; 
+    flex-wrap: wrap; 
+    align-items: flex-start; /* Allow cards to have different heights */
+    gap: 12px; 
+    padding: 15px; 
+}
+
+.stage-card { 
+    background-color: var(--card-bg); 
+    border: 1px solid var(--border-color); 
+    border-radius: 8px; 
+    padding: 12px; 
+    box-shadow: var(--shadow); 
+    display: flex; 
+    flex-direction: column;
+    /* Cards grow and shrink but have a base size */
+    flex: 1 1 340px; 
+}
+
+.stage-header h2 { margin: 0 0 12px 0; font-size: 16px; color: var(--text-primary); border-bottom: 2px solid var(--accent-color); padding-bottom: 8px; }
+.device-group { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; align-content: flex-start; }
+
+.device {
+    display: flex;
+    flex-direction: column;
+    background-color: #fdfdfd;
+    border: 1px solid #f0f0f0;
+    border-left: 4px solid var(--text-secondary);
+    border-radius: 4px;
+    padding: 6px 8px;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: visible;
+}
+
+.device-top-row, .device-bottom-row { display: flex; align-items: center; width: 100%; }
+.device-top-row { gap: 8px; margin-bottom: 4px; }
+.device-bottom-row { justify-content: space-between; }
+.device.hidden { display: none; }
+.device-icon { flex-shrink: 0; width: 16px; text-align: center; color: var(--text-secondary); }
+.device-id { font-weight: 500; }
+.device-value { font-size: 1.1em; font-weight: bold; color: var(--accent-color); }
+.device-change { font-size: 10px; }
+.device-change.up { color: var(--green); }
+.device-change.down { color: var(--orange); }
+.device.on { border-left-color: var(--green); }
+.device.on .device-icon { color: var(--green); }
+.device.off { border-left-color: var(--red); }
+.device.off .device-icon { color: var(--red); }
+.device.attack-target { border: 1px solid var(--red); border-left-width: 4px; box-shadow: 0 0 8px rgba(220, 53, 69, 0.5); transform: scale(1.02); z-index: 10; }
+
+[data-tooltip] { position: relative; }
+[data-tooltip]::after { content: attr(data-tooltip); position: absolute; bottom: 120%; left: 50%; transform: translateX(-50%); background-color: #333; color: white; padding: 6px 10px; border-radius: 4px; font-size: 12px; width: max-content; max-width: 250px; text-align: center; opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; z-index: 1001; }
+[data-tooltip]:hover::after { opacity: 1; visibility: visible; }
+
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 2000; transition: opacity 0.3s, visibility 0.3s; }
+.modal-overlay.hidden { opacity: 0; visibility: hidden; }
+.modal-content { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 1000px; max-height: 80vh; display: flex; flex-direction: column; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px; }
+.close-btn { background: none; border: none; font-size: 24px; cursor: pointer; }
+.modal-body { overflow-y: auto; }
+.filter-stage-group { margin-bottom: 15px; }
+.filter-stage-group h3 { margin: 0 0 10px; font-size: 14px; border-bottom: 1px solid #eee; padding-bottom: 5px; cursor: pointer; }
+.filter-stage-group h3 label { display: flex; align-items: center; width: 100%; }
+.filter-stage-group h3 input { margin-right: 8px; }
+.filter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; padding-left: 25px; }
+.filter-grid label { display: flex; align-items: center; font-size: 12px; cursor: pointer; }
+.modal-footer { border-top: 1px solid var(--border-color); padding-top: 15px; margin-top: 15px; text-align: right; }
+.modal-footer button { margin-left: 10px; padding: 8px 16px; border: 1px solid #ccc; background: #eee; border-radius: 4px; cursor: pointer; }
+.modal-footer button#filter-apply-btn { background: var(--accent-color); color: white; border-color: var(--accent-color); }
