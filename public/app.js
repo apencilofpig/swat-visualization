@@ -1,4 +1,4 @@
-// public/app.js (v11)
+// public/app.js (v13)
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Element Cache ---
     const headerEl = document.querySelector('header');
@@ -143,8 +143,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             });
-
+            
+            // --- Highlight logic restored and placed here ---
+            // 1. Clear all previous highlights first
             document.querySelectorAll('.device.attack-target').forEach(el => el.classList.remove('attack-target'));
+            
             attackInfoWrapper.classList.add('hidden');
             if (attackInfo.isActive) {
                 attackStatusEl.textContent = '受攻击';
@@ -153,6 +156,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 attackDetailsEl.textContent = attackInfo.description;
                 attackInfoWrapper.classList.remove('hidden');
                 collapsedAttackStatusEl.innerHTML = `状态: <span class="attack">受攻击 (ID: ${attackInfo.attackId})</span>`;
+
+                // 2. Apply new highlights
+                attackInfo.targets.forEach(targetId => {
+                    const targetEl = document.getElementById(targetId);
+                    if (targetEl) {
+                        targetEl.classList.add('attack-target');
+                    }
+                });
             } else {
                 attackStatusEl.textContent = '正常';
                 attackStatusEl.classList.remove('attack');
