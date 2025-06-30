@@ -123,6 +123,7 @@ app.get('/api/data/history', (req, res) => {
         return res.status(400).json({ error: 'Invalid numerical parameters.' });
     }
     
+    // Ensure the start index is not negative
     const start = Math.max(0, end - duration);
 
     if (start >= swatData.length) {
@@ -130,9 +131,10 @@ app.get('/api/data/history', (req, res) => {
     }
 
     const historySlice = swatData.slice(start, end + 1);
-
+    
+    // Map data to the format expected by the front-end chart
     const chartData = historySlice.map(record => ({
-        timestamp: record.Timestamp,
+        jsTimestamp: record.jsTimestamp.getTime(), // Send timestamp in milliseconds
         value: parseFloat(record[deviceId])
     }));
 

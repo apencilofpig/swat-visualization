@@ -187,25 +187,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    /**
+     * Renders the historical data chart using Chart.js with a time scale.
+     * @param {Array<Object>} data - Array of data points, e.g., [{jsTimestamp: 1672200000000, value: 123.45}]
+     */
     function renderHistoryChart(data) {
         if (historyChart) {
             historyChart.destroy();
         }
 
-        const labels = data.map(d => d.timestamp.split(' ')[1]);
-        const values = data.map(d => d.value);
+        if (!data || data.length === 0) {
+            // Optional: Display a message or clear the canvas
+            const ctx = historyChartCanvas.getContext('2d');
+            ctx.clearRect(0, 0, historyChartCanvas.width, historyChartCanvas.height);
+            ctx.textAlign = 'center';
+            ctx.fillText('No data available for this period.', historyChartCanvas.width / 2, historyChartCanvas.height / 2);
+            return;
+        }
+
+        const chartDataPoints = data.map(d => ({
+            x: d.jsTimestamp,
+            y: d.value
+        }));
+        
+        // Dynamically determine the time unit for the x-axis display
+        const timeRangeMs = data.length > 1 ? data[data.length - 1].jsTimestamp - data[0].jsTimestamp : 0;
+        let unit = 'day';
+        
+        if (timeRangeMs <= 2 * 60 * 1000) { // <= 2 minutes, show seconds
+            unit = 'second';
+        } else if (timeRangeMs <= 2 * 60 * 60 * 1000) { // <= 2 hours, show minutes
+            unit = 'minute';
+        } else if (timeRangeMs <= 2 * 24 * 60 * 60 * 1000) { // <= 2 days, show hours
+            unit = 'hour';
+        }
+        // Otherwise, default to 'day'
 
         historyChart = new Chart(historyChartCanvas, {
             type: 'line',
             data: {
-                labels: labels,
                 datasets: [{
                     label: currentChartDeviceId,
-                    data: values,
+                    data: chartDataPoints,
                     borderColor: 'rgba(0, 123, 255, 1)',
                     backgroundColor: 'rgba(0, 123, 255, 0.1)',
-                    borderWidth: 2,
-                    pointRadius: 1,
+                    borderWidth: 1.5,
+                    pointRadius: 0, // Hide points for cleaner look with lots of data
+                    pointHoverRadius: 5,
                     tension: 0.1,
                     fill: true,
                 }]
@@ -214,12 +242,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    x: { ticks: { maxRotation: 70, minRotation: 70 } },
-                    y: { beginAtZero: false }
+                    x: {
+                        type: 'time',
+                        time: {
+                            unit: unit,
+                            tooltipFormat: 'dd/MM/yyyy HH:mm:ss', // Consistent full format in tooltip
+                             displayFormats: {
+                                second: 'HH:mm:ss',
+                                minute: 'HH:mm',
+                                hour: 'MMM d, HH:mm',
+                                day: 'MMM d, yyyy',
+                            }
+                        },
+                        ticks: {
+                            source: 'auto',
+                            maxRotation: 70,
+                            minRotation: 70,
+                        }
+                    },
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: 'Value'
+                        }
+                    }
+                },
+                plugins: {
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    legend: {
+                        display: true
+                    }
                 }
             }
         });
     }
+
 
     function addEventListeners() {
         const manualTimeInput = document.getElementById('manual-time-input');
@@ -239,8 +300,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (deviceEl) {
                 const deviceId = deviceEl.dataset.deviceId;
                 chartModal.classList.remove('hidden');
-                fetchAndDisplayHistory(deviceId, 60);
-                document.querySelector('.range-btn[data-seconds="60"]').classList.add('active');
+                // Set default active button and fetch data
+                const defaultSeconds = 60;
+                document.querySelectorAll('.range-btn.active').forEach(b => b.classList.remove('active'));
+                document.querySelector(`.range-btn[data-seconds="${defaultSeconds}"]`).classList.add('active');
+                fetchAndDisplayHistory(deviceId, defaultSeconds);
             }
         });
         

@@ -90,13 +90,13 @@ h1 { text-align: center; color: var(--accent-color); font-weight: 500; font-size
     padding: 15px; 
 }
 
-.stage-card { 
-    background-color: var(--card-bg); 
-    border: 1px solid var(--border-color); 
-    border-radius: 8px; 
-    padding: 12px; 
-    box-shadow: var(--shadow); 
-    display: flex; 
+.stage-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: var(--shadow);
+    display: flex;
     flex-direction: column;
     flex-grow: 1;
     flex-shrink: 1;
