@@ -72,7 +72,11 @@ h1 { text-align: center; color: var(--accent-color); font-weight: 500; font-size
 #controls { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
 #play-pause-btn { background: none; border: 1px solid #ccc; border-radius: 50%; width: 36px; height: 36px; cursor: pointer; font-size: 14px; color: var(--text-secondary); transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; }
 #play-pause-btn:hover { background-color: #e9ecef; }
-#speed-control { padding: 6px; border: 1px solid #ccc; border-radius: 4px; background-color: white; }
+#speed-control, #attack-list { padding: 6px; border: 1px solid #ccc; border-radius: 4px; background-color: white; }
+#attack-list {
+    max-width: 180px;
+    text-overflow: ellipsis;
+}
 #time-slider { flex-grow: 1; max-width: 500px; }
 .time-input-container { display: flex; }
 #manual-time-input { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px 0 0 4px; font-size: 13px; }

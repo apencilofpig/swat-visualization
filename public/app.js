@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const manualTimeInput = document.getElementById('manual-time-input');
     const jumpToTimeBtn = document.getElementById('jump-to-time-btn');
     const dashboardContainer = document.querySelector('.dashboard-container');
+    const attackListEl = document.getElementById('attack-list');
     
     // Collapsible Header Elements
     const headerToggleBtn = document.getElementById('header-toggle-btn');
@@ -105,11 +106,35 @@ document.addEventListener('DOMContentLoaded', () => {
             totalRecords = data.totalRecords;
             timeSlider.max = totalRecords - 1;
             await updateDisplay(0, true);
+            await loadAndPopulateAttacks();
         } catch (error) {
             console.error("Initialization failed:", error);
             timestampDisplay.textContent = "数据加载错误";
         }
     }
+    
+    async function loadAndPopulateAttacks() {
+        try {
+            const response = await fetch('/api/attacks');
+            const attacks = await response.json();
+            attacks.forEach(attack => {
+                const option = document.createElement('option');
+                option.value = attack.startTime;
+                // Truncate long descriptions for display in the dropdown
+                const displayText = `${attack.id}: ${attack.description}`;
+                option.textContent = displayText.length > 30 ? displayText.substring(0, 27) + '...' : displayText;
+                option.title = attack.description; // Full description on hover
+                attackListEl.appendChild(option);
+            });
+        } catch (error) {
+            console.error("Failed to load attacks:", error);
+            const option = document.createElement('option');
+            option.textContent = '无法加载攻击列表';
+            option.disabled = true;
+            attackListEl.appendChild(option);
+        }
+    }
+
 
     async function updateDisplay(index, forceNoDiff = false) {
         index = parseInt(index, 10);
@@ -187,17 +212,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    /**
-     * Renders the historical data chart using Chart.js with a time scale.
-     * @param {Array<Object>} data - Array of data points, e.g., [{jsTimestamp: 1672200000000, value: 123.45}]
-     */
     function renderHistoryChart(data) {
         if (historyChart) {
             historyChart.destroy();
         }
 
         if (!data || data.length === 0) {
-            // Optional: Display a message or clear the canvas
             const ctx = historyChartCanvas.getContext('2d');
             ctx.clearRect(0, 0, historyChartCanvas.width, historyChartCanvas.height);
             ctx.textAlign = 'center';
@@ -210,7 +230,6 @@ document.addEventListener('DOMContentLoaded', () => {
             y: d.value
         }));
         
-        // Dynamically determine the time unit for the x-axis display
         const timeRangeMs = data.length > 1 ? data[data.length - 1].jsTimestamp - data[0].jsTimestamp : 0;
         let unit = 'day';
         
@@ -221,7 +240,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (timeRangeMs <= 2 * 24 * 60 * 60 * 1000) { // <= 2 days, show hours
             unit = 'hour';
         }
-        // Otherwise, default to 'day'
 
         historyChart = new Chart(historyChartCanvas, {
             type: 'line',
@@ -232,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     borderColor: 'rgba(0, 123, 255, 1)',
                     backgroundColor: 'rgba(0, 123, 255, 0.1)',
                     borderWidth: 1.5,
-                    pointRadius: 0, // Hide points for cleaner look with lots of data
+                    pointRadius: 0, 
                     pointHoverRadius: 5,
                     tension: 0.1,
                     fill: true,
@@ -246,7 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         type: 'time',
                         time: {
                             unit: unit,
-                            tooltipFormat: 'dd/MM/yyyy HH:mm:ss', // Consistent full format in tooltip
+                            tooltipFormat: 'dd/MM/yyyy HH:mm:ss',
                              displayFormats: {
                                 second: 'HH:mm:ss',
                                 minute: 'HH:mm',
@@ -295,12 +313,31 @@ document.addEventListener('DOMContentLoaded', () => {
         speedControl.addEventListener('change', () => { if (isPlaying) { togglePlay(); togglePlay(); } });
         jumpToTimeBtn.addEventListener('click', jumpToTime);
 
+        // Event listener for the new attack list dropdown
+        attackListEl.addEventListener('change', async () => {
+            const selectedTime = attackListEl.value;
+            if (!selectedTime) return;
+
+            try {
+                const response = await fetch(`/api/data/by-timestamp?time=${encodeURIComponent(selectedTime)}`);
+                if (!response.ok) throw new Error((await response.json()).error);
+                
+                const { index } = await response.json();
+                if (isPlaying) togglePlay(); // Pause if playing
+                await updateDisplay(index, true);
+                
+                attackListEl.selectedIndex = 0; // Reset dropdown
+            } catch(error) {
+                alert(`跳转失败: ${error.message}`);
+                attackListEl.selectedIndex = 0;
+            }
+        });
+
         dashboardContainer.addEventListener('click', (e) => {
             const deviceEl = e.target.closest('.device');
             if (deviceEl) {
                 const deviceId = deviceEl.dataset.deviceId;
                 chartModal.classList.remove('hidden');
-                // Set default active button and fetch data
                 const defaultSeconds = 60;
                 document.querySelectorAll('.range-btn.active').forEach(b => b.classList.remove('active'));
                 document.querySelector(`.range-btn[data-seconds="${defaultSeconds}"]`).classList.add('active');
