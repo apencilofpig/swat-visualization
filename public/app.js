@@ -1,4 +1,4 @@
-// public/app.js (v13)
+// public/app.js
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Element Cache ---
     const headerEl = document.querySelector('header');
@@ -30,9 +30,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const selectAllBtn = document.getElementById('filter-select-all-btn');
     const deselectAllBtn = document.getElementById('filter-deselect-all-btn');
 
+    // Chart Modal elements
+    const chartModal = document.getElementById('chart-modal');
+    const chartModalTitle = document.getElementById('chart-modal-title');
+    const closeChartModalBtn = document.getElementById('close-chart-modal-btn');
+    const historyChartCanvas = document.getElementById('history-chart');
+    const chartControls = document.querySelector('.chart-controls');
+    
     // --- State Variables ---
     let timer = null;
     let isPlaying = false;
+    let totalRecords = 0;
+    let historyChart = null; // To hold the Chart.js instance
+    let currentChartDeviceId = null;
 
     // --- Configuration with FULL Tooltips (RESTORED) ---
     const deviceConfig = {
@@ -57,7 +67,6 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const stageId in deviceConfig) {
             const stage = deviceConfig[stageId];
             const deviceCount = Object.keys(stage.devices).length;
-            
             const layoutClass = deviceCount > 6 ? 'two-columns' : '';
             const flexBasis = deviceCount > 6 ? '240px' : '100px';
 
@@ -89,10 +98,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function initialize() {
         buildDashboardAndFilters();
-        addFilterEventListeners();
+        addEventListeners();
         try {
             const response = await fetch('/api/data/info');
-            const { totalRecords } = await response.json();
+            const data = await response.json();
+            totalRecords = data.totalRecords;
             timeSlider.max = totalRecords - 1;
             await updateDisplay(0, true);
         } catch (error) {
@@ -103,8 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function updateDisplay(index, forceNoDiff = false) {
         index = parseInt(index, 10);
-        if (isNaN(index) || index < 0 || !timeSlider.max || index > timeSlider.max) return;
-
+        if (isNaN(index) || index < 0 || !totalRecords || index >= totalRecords) return;
         try {
             const response = await fetch(`/api/data/by-index/${index}`);
             const { timestampData, prevTimestampData, attackInfo } = await response.json();
@@ -112,7 +121,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             timeSlider.value = index;
             const displayTime = timestampData.Timestamp.replace(' AM', '').replace(' PM', '');
-            
             timestampDisplay.textContent = displayTime;
             collapsedTimestampEl.textContent = `时间: ${displayTime}`;
             
@@ -122,7 +130,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const key = deviceEl.dataset.deviceId;
                 const valueEl = deviceEl.querySelector('.device-value');
                 const changeEl = deviceEl.querySelector('.device-change');
-
                 if (valueEl && timestampData[key] !== undefined) {
                     const currentValue = parseFloat(timestampData[key]);
                     valueEl.textContent = Number.isInteger(currentValue) ? currentValue : currentValue.toFixed(2);
@@ -144,55 +151,137 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             
-            // --- Highlight logic restored and placed here ---
-            // 1. Clear all previous highlights first
             document.querySelectorAll('.device.attack-target').forEach(el => el.classList.remove('attack-target'));
-            
+            const attackInfoWrapper = document.getElementById('attack-info-wrapper');
             attackInfoWrapper.classList.add('hidden');
             if (attackInfo.isActive) {
-                attackStatusEl.textContent = '受攻击';
-                attackStatusEl.classList.add('attack');
-                attackIdEl.textContent = attackInfo.attackId;
-                attackDetailsEl.textContent = attackInfo.description;
+                document.getElementById('attack-status').textContent = '受攻击';
+                document.getElementById('attack-status').classList.add('attack');
+                document.getElementById('attack-id').textContent = attackInfo.attackId;
+                document.getElementById('attack-details').textContent = attackInfo.description;
                 attackInfoWrapper.classList.remove('hidden');
                 collapsedAttackStatusEl.innerHTML = `状态: <span class="attack">受攻击 (ID: ${attackInfo.attackId})</span>`;
-
-                // 2. Apply new highlights
                 attackInfo.targets.forEach(targetId => {
                     const targetEl = document.getElementById(targetId);
-                    if (targetEl) {
-                        targetEl.classList.add('attack-target');
-                    }
+                    if (targetEl) targetEl.classList.add('attack-target');
                 });
             } else {
-                attackStatusEl.textContent = '正常';
-                attackStatusEl.classList.remove('attack');
+                document.getElementById('attack-status').textContent = '正常';
+                document.getElementById('attack-status').classList.remove('attack');
                 collapsedAttackStatusEl.innerHTML = '状态: 正常';
             }
         } catch (error) { console.error(`Failed to update display for index ${index}:`, error); }
     }
     
-    async function playbackStep() {
-        if (!isPlaying) return;
-        let currentIndex = parseInt(timeSlider.value, 10);
-        if (currentIndex < timeSlider.max) {
-            await updateDisplay(currentIndex + 1);
-            const speed = parseFloat(speedControl.value);
-            const interval = 1000 / speed;
-            timer = setTimeout(playbackStep, interval);
-        } else {
-            togglePlay();
+    async function fetchAndDisplayHistory(deviceId, seconds) {
+        currentChartDeviceId = deviceId;
+        chartModalTitle.textContent = `${deviceId} - 历史数据`;
+        
+        try {
+            const endIndex = timeSlider.value;
+            const response = await fetch(`/api/data/history?deviceId=${deviceId}&endIndex=${endIndex}&seconds=${seconds}`);
+            const data = await response.json();
+            renderHistoryChart(data);
+        } catch (error) {
+            console.error('Failed to fetch history:', error);
         }
     }
+    
+    function renderHistoryChart(data) {
+        if (historyChart) {
+            historyChart.destroy();
+        }
 
-    function togglePlay() {
-        isPlaying = !isPlaying;
-        playIcon.className = isPlaying ? 'fas fa-pause' : 'fas fa-play';
-        clearTimeout(timer);
-        if (isPlaying) playbackStep();
+        const labels = data.map(d => d.timestamp.split(' ')[1]);
+        const values = data.map(d => d.value);
+
+        historyChart = new Chart(historyChartCanvas, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: currentChartDeviceId,
+                    data: values,
+                    borderColor: 'rgba(0, 123, 255, 1)',
+                    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 1,
+                    tension: 0.1,
+                    fill: true,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { ticks: { maxRotation: 70, minRotation: 70 } },
+                    y: { beginAtZero: false }
+                }
+            }
+        });
     }
 
+    function addEventListeners() {
+        const manualTimeInput = document.getElementById('manual-time-input');
+        const jumpToTimeBtn = document.getElementById('jump-to-time-btn');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const applyFilterBtn = document.getElementById('filter-apply-btn');
+        const selectAllBtn = document.getElementById('filter-select-all-btn');
+        const deselectAllBtn = document.getElementById('filter-deselect-all-btn');
+        
+        timeSlider.addEventListener('input', (e) => updateDisplay(e.target.value, true));
+        playPauseBtn.addEventListener('click', togglePlay);
+        speedControl.addEventListener('change', () => { if (isPlaying) { togglePlay(); togglePlay(); } });
+        jumpToTimeBtn.addEventListener('click', jumpToTime);
+
+        dashboardContainer.addEventListener('click', (e) => {
+            const deviceEl = e.target.closest('.device');
+            if (deviceEl) {
+                const deviceId = deviceEl.dataset.deviceId;
+                chartModal.classList.remove('hidden');
+                fetchAndDisplayHistory(deviceId, 60);
+                document.querySelector('.range-btn[data-seconds="60"]').classList.add('active');
+            }
+        });
+        
+        openFilterBtn.addEventListener('click', () => filterModal.classList.remove('hidden'));
+        closeModalBtn.addEventListener('click', () => filterModal.classList.add('hidden'));
+        applyFilterBtn.addEventListener('click', applyFilters);
+        selectAllBtn.addEventListener('click', () => document.querySelectorAll('.filter-checkbox, .stage-filter-checkbox').forEach(cb => cb.checked = true));
+        deselectAllBtn.addEventListener('click', () => document.querySelectorAll('.filter-checkbox, .stage-filter-checkbox').forEach(cb => cb.checked = false));
+        document.querySelectorAll('.stage-filter-checkbox').forEach(cb => cb.addEventListener('change', handleStageFilterChange));
+        document.querySelectorAll('.filter-checkbox').forEach(cb => cb.addEventListener('change', handleDeviceFilterChange));
+        
+        closeChartModalBtn.addEventListener('click', () => {
+            chartModal.classList.add('hidden');
+            if (historyChart) { historyChart.destroy(); }
+            currentChartDeviceId = null;
+            document.querySelectorAll('.range-btn.active').forEach(b => b.classList.remove('active'));
+        });
+        chartControls.addEventListener('click', (e) => {
+            if (e.target.classList.contains('range-btn')) {
+                document.querySelectorAll('.range-btn.active').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                const seconds = e.target.dataset.seconds;
+                if (currentChartDeviceId) {
+                    fetchAndDisplayHistory(currentChartDeviceId, seconds);
+                }
+            }
+        });
+        
+        headerToggleBtn.addEventListener('click', () => {
+            const isCollapsing = !headerEl.classList.contains('collapsed');
+            headerEl.classList.toggle('collapsed');
+            headerCollapsibleContent.classList.toggle('hidden', isCollapsing);
+            headerCollapsedView.classList.toggle('hidden', !isCollapsing);
+            headerToggleBtn.querySelector('i').className = isCollapsing ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
+        });
+    }
+
+    function togglePlay() { isPlaying = !isPlaying; playIcon.className = isPlaying ? 'fas fa-pause' : 'fas fa-play'; clearTimeout(timer); if (isPlaying) playbackStep(); }
+    async function playbackStep() { if (!isPlaying) return; let currentIndex = parseInt(timeSlider.value, 10); if (currentIndex < totalRecords - 1) { await updateDisplay(currentIndex + 1); const speed = parseFloat(speedControl.value); const interval = 1000 / speed; timer = setTimeout(playbackStep, interval); } else { togglePlay(); } }
     async function jumpToTime() {
+        const manualTimeInput = document.getElementById('manual-time-input');
         if (!manualTimeInput.value) return;
         const [datePart, timePart] = manualTimeInput.value.split('T');
         const [year, month, day] = datePart.split('-');
@@ -205,7 +294,6 @@ document.addEventListener('DOMContentLoaded', () => {
             await updateDisplay(index, true);
         } catch(error) { alert(`错误: ${error.message}`); }
     }
-
     function applyFilters() {
         const visibleDevices = new Set();
         document.querySelectorAll('.filter-checkbox:checked').forEach(cb => visibleDevices.add(cb.value));
@@ -214,47 +302,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         filterModal.classList.add('hidden');
     }
+    function handleStageFilterChange(e) { const stageId = e.target.dataset.stage; document.querySelectorAll(`.filter-checkbox[data-stage="${stageId}"]`).forEach(cb => cb.checked = e.target.checked); }
+    function handleDeviceFilterChange(e) { const stageId = e.target.dataset.stage; const siblings = document.querySelectorAll(`.filter-checkbox[data-stage="${stageId}"]`); const allChecked = Array.from(siblings).every(cb => cb.checked); document.querySelector(`.stage-filter-checkbox[data-stage="${stageId}"]`).checked = allChecked; }
 
-    function addFilterEventListeners() {
-        openFilterBtn.addEventListener('click', () => filterModal.classList.remove('hidden'));
-        closeModalBtn.addEventListener('click', () => filterModal.classList.add('hidden'));
-        applyFilterBtn.addEventListener('click', applyFilters);
-        selectAllBtn.addEventListener('click', () => document.querySelectorAll('.filter-checkbox, .stage-filter-checkbox').forEach(cb => cb.checked = true));
-        deselectAllBtn.addEventListener('click', () => document.querySelectorAll('.filter-checkbox, .stage-filter-checkbox').forEach(cb => cb.checked = false));
-
-        document.querySelectorAll('.stage-filter-checkbox').forEach(stageCb => {
-            stageCb.addEventListener('change', (e) => {
-                const stageId = e.target.dataset.stage;
-                document.querySelectorAll(`.filter-checkbox[data-stage="${stageId}"]`).forEach(deviceCb => deviceCb.checked = e.target.checked);
-            });
-        });
-
-        document.querySelectorAll('.filter-checkbox').forEach(deviceCb => {
-            deviceCb.addEventListener('change', (e) => {
-                const stageId = e.target.dataset.stage;
-                const siblings = document.querySelectorAll(`.filter-checkbox[data-stage="${stageId}"]`);
-                const allChecked = Array.from(siblings).every(cb => cb.checked);
-                document.querySelector(`.stage-filter-checkbox[data-stage="${stageId}"]`).checked = allChecked;
-            });
-        });
-        
-        speedControl.addEventListener('change', () => {
-            if (isPlaying) {
-                togglePlay(); togglePlay();
-            }
-        });
-
-        headerToggleBtn.addEventListener('click', () => {
-            const isCollapsing = !headerEl.classList.contains('collapsed');
-            headerEl.classList.toggle('collapsed');
-            headerCollapsibleContent.classList.toggle('hidden', isCollapsing);
-            headerCollapsedView.classList.toggle('hidden', !isCollapsing);
-            headerToggleBtn.querySelector('i').className = isCollapsing ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
-        });
-    }
-
-    timeSlider.addEventListener('input', (e) => updateDisplay(e.target.value, true));
-    playPauseBtn.addEventListener('click', togglePlay);
-    jumpToTimeBtn.addEventListener('click', jumpToTime);
     initialize();
 });
