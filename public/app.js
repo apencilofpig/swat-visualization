@@ -15,6 +15,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const jumpToTimeBtn = document.getElementById('jump-to-time-btn');
     const dashboardContainer = document.querySelector('.dashboard-container');
     const attackListEl = document.getElementById('attack-list');
+    const rewindBtn = document.getElementById('rewind-btn');
+    const forwardBtn = document.getElementById('forward-btn');
+    const fillCurrentTimeBtn = document.getElementById('fill-current-time-btn');
     
     // Collapsible Header Elements
     const headerToggleBtn = document.getElementById('header-toggle-btn');
@@ -44,8 +47,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let totalRecords = 0;
     let historyChart = null; // To hold the Chart.js instance
     let currentChartDeviceId = null;
+    let currentJsTimestamp = null; // Store the JS timestamp of the currently displayed record
 
-    // --- Configuration with FULL Tooltips (RESTORED) ---
+    // --- Configuration with FULL Tooltips ---
     const deviceConfig = {
         p1: { name: "P1: 原水供给", devices: { "FIT101": "流量计，测量进入原水箱的流量。", "LIT101": "液位变送器，测量原水箱水位。", "MV101": "电动阀，控制水流入原水箱。", "P101": "水泵，将水从原水箱泵送到第二阶段。", "P102": "P101的备用泵。" }},
         p2: { name: "P2: 化学加药", devices: { "AIT201": "电导率分析仪，测量NaCl水平。", "AIT202": "pH分析仪，测量HCl水平。", "AIT203": "ORP分析仪，测量NaOCl水平。", "FIT201": "流量变送器，控制加药泵。", "MV201": "电动阀，控制水流向UF给水箱。", "P201": "NaCl加药泵。", "P202": "P201的备用泵。", "P203": "HCl加药泵。", "P204": "P203的备用泵。", "P205": "NaOCl加药泵。", "P206": "P205的备用泵。" }},
@@ -120,10 +124,9 @@ document.addEventListener('DOMContentLoaded', () => {
             attacks.forEach(attack => {
                 const option = document.createElement('option');
                 option.value = attack.startTime;
-                // Truncate long descriptions for display in the dropdown
                 const displayText = `${attack.id}: ${attack.description}`;
                 option.textContent = displayText.length > 30 ? displayText.substring(0, 27) + '...' : displayText;
-                option.title = attack.description; // Full description on hover
+                option.title = attack.description;
                 attackListEl.appendChild(option);
             });
         } catch (error) {
@@ -145,21 +148,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!timestampData) return;
 
             timeSlider.value = index;
+            currentJsTimestamp = timestampData.jsTimestamp;
 
-            // Create a Date object from the ISO string sent by the server
-            const date = new Date(timestampData.jsTimestamp);
-
-            // Format it into DD/MM/YYYY HH:mm:ss (24-hour format)
+            const date = new Date(currentJsTimestamp);
             const day = String(date.getUTCDate()).padStart(2, '0');
-            const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Month is 0-indexed
+            const month = String(date.getUTCMonth() + 1).padStart(2, '0');
             const year = date.getUTCFullYear();
             const hours = String(date.getUTCHours()).padStart(2, '0');
             const minutes = String(date.getUTCMinutes()).padStart(2, '0');
             const seconds = String(date.getUTCSeconds()).padStart(2, '0');
             
-            // Reconstruct the original format but with guaranteed 24-hour time
             const displayTime = `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
-
             timestampDisplay.textContent = displayTime;
             collapsedTimestampEl.textContent = `时间: ${displayTime}`;
             
@@ -191,13 +190,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             document.querySelectorAll('.device.attack-target').forEach(el => el.classList.remove('attack-target'));
-            const attackInfoWrapper = document.getElementById('attack-info-wrapper');
             attackInfoWrapper.classList.add('hidden');
             if (attackInfo.isActive) {
-                document.getElementById('attack-status').textContent = '受攻击';
-                document.getElementById('attack-status').classList.add('attack');
-                document.getElementById('attack-id').textContent = attackInfo.attackId;
-                document.getElementById('attack-details').textContent = attackInfo.description;
+                attackStatusEl.textContent = '受攻击';
+                attackStatusEl.classList.add('attack');
+                attackIdEl.textContent = attackInfo.attackId;
+                attackDetailsEl.textContent = attackInfo.description;
                 attackInfoWrapper.classList.remove('hidden');
                 collapsedAttackStatusEl.innerHTML = `状态: <span class="attack">受攻击 (ID: ${attackInfo.attackId})</span>`;
                 attackInfo.targets.forEach(targetId => {
@@ -205,8 +203,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (targetEl) targetEl.classList.add('attack-target');
                 });
             } else {
-                document.getElementById('attack-status').textContent = '正常';
-                document.getElementById('attack-status').classList.remove('attack');
+                attackStatusEl.textContent = '正常';
+                attackStatusEl.classList.remove('attack');
                 collapsedAttackStatusEl.innerHTML = '状态: 正常';
             }
         } catch (error) { console.error(`Failed to update display for index ${index}:`, error); }
@@ -247,12 +245,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const timeRangeMs = data.length > 1 ? data[data.length - 1].jsTimestamp - data[0].jsTimestamp : 0;
         let unit = 'day';
         
-        if (timeRangeMs <= 2 * 60 * 1000) { // <= 2 minutes, show seconds
-            unit = 'second';
-        } else if (timeRangeMs <= 2 * 60 * 60 * 1000) { // <= 2 hours, show minutes
-            unit = 'minute';
-        } else if (timeRangeMs <= 2 * 24 * 60 * 60 * 1000) { // <= 2 days, show hours
-            unit = 'hour';
+        if (timeRangeMs <= 2 * 60 * 1000) { unit = 'second';
+        } else if (timeRangeMs <= 2 * 60 * 60 * 1000) { unit = 'minute';
+        } else if (timeRangeMs <= 2 * 24 * 60 * 60 * 1000) { unit = 'hour';
         }
 
         historyChart = new Chart(historyChartCanvas, {
@@ -276,58 +271,61 @@ document.addEventListener('DOMContentLoaded', () => {
                 scales: {
                     x: {
                         type: 'time',
+                        adapters: {
+                            date: {
+                                zone: 'UTC'
+                            }
+                        },
                         time: {
                             unit: unit,
                             tooltipFormat: 'dd/MM/yyyy HH:mm:ss',
                              displayFormats: {
                                 second: 'HH:mm:ss',
                                 minute: 'HH:mm',
-                                hour: 'MMM d, HH:mm',
-                                day: 'MMM d, yy',
+                                hour: 'dd/MM HH:mm',
+                                day: 'dd/MM/yy',
                             }
                         },
-                        ticks: {
-                            source: 'auto',
-                            maxRotation: 70,
-                            minRotation: 70,
-                        }
+                        ticks: { source: 'auto', maxRotation: 70, minRotation: 70 }
                     },
-                    y: {
-                        beginAtZero: false,
-                        title: {
-                            display: true,
-                            text: 'Value'
-                        }
-                    }
+                    y: { beginAtZero: false, title: { display: true, text: 'Value' } }
                 },
                 plugins: {
-                    tooltip: {
-                        mode: 'index',
-                        intersect: false
-                    },
-                    legend: {
-                        display: true
-                    }
+                    tooltip: { mode: 'index', intersect: false },
+                    legend: { display: true }
                 }
             }
         });
     }
 
+    function jumpBySeconds(seconds) {
+        if (isPlaying) togglePlay();
+        let newIndex = parseInt(timeSlider.value, 10) + seconds;
+        newIndex = Math.max(0, Math.min(totalRecords - 1, newIndex));
+        updateDisplay(newIndex, true);
+    }
 
     function addEventListeners() {
-        const manualTimeInput = document.getElementById('manual-time-input');
-        const jumpToTimeBtn = document.getElementById('jump-to-time-btn');
-        const closeModalBtn = document.getElementById('close-modal-btn');
-        const applyFilterBtn = document.getElementById('filter-apply-btn');
-        const selectAllBtn = document.getElementById('filter-select-all-btn');
-        const deselectAllBtn = document.getElementById('filter-deselect-all-btn');
-        
         timeSlider.addEventListener('input', (e) => updateDisplay(e.target.value, true));
         playPauseBtn.addEventListener('click', togglePlay);
         speedControl.addEventListener('change', () => { if (isPlaying) { togglePlay(); togglePlay(); } });
         jumpToTimeBtn.addEventListener('click', jumpToTime);
 
-        // Event listener for the new attack list dropdown
+        rewindBtn.addEventListener('click', () => jumpBySeconds(-30));
+        forwardBtn.addEventListener('click', () => jumpBySeconds(30));
+        fillCurrentTimeBtn.addEventListener('click', () => {
+            if (currentJsTimestamp) {
+                const date = new Date(currentJsTimestamp);
+                const y = date.getUTCFullYear();
+                const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+                const d = String(date.getUTCDate()).padStart(2, '0');
+                const h = String(date.getUTCHours()).padStart(2, '0');
+                const min = String(date.getUTCMinutes()).padStart(2, '0');
+                const s = String(date.getUTCSeconds()).padStart(2, '0');
+                manualTimeInput.value = `${y}-${m}-${d}T${h}:${min}:${s}`;
+            }
+        });
+
         attackListEl.addEventListener('change', async () => {
             const selectedTime = attackListEl.value;
             if (!selectedTime) return;
@@ -337,10 +335,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!response.ok) throw new Error((await response.json()).error);
                 
                 const { index } = await response.json();
-                if (isPlaying) togglePlay(); // Pause if playing
+                if (isPlaying) togglePlay();
                 await updateDisplay(index, true);
                 
-                attackListEl.selectedIndex = 0; // Reset dropdown
+                attackListEl.selectedIndex = 0;
             } catch(error) {
                 alert(`跳转失败: ${error.message}`);
                 attackListEl.selectedIndex = 0;
@@ -395,12 +393,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function togglePlay() { isPlaying = !isPlaying; playIcon.className = isPlaying ? 'fas fa-pause' : 'fas fa-play'; clearTimeout(timer); if (isPlaying) playbackStep(); }
     async function playbackStep() { if (!isPlaying) return; let currentIndex = parseInt(timeSlider.value, 10); if (currentIndex < totalRecords - 1) { await updateDisplay(currentIndex + 1); const speed = parseFloat(speedControl.value); const interval = 1000 / speed; timer = setTimeout(playbackStep, interval); } else { togglePlay(); } }
+    
+    // BUG FIX: Correctly handle datetime-local input as UTC
     async function jumpToTime() {
-        const manualTimeInput = document.getElementById('manual-time-input');
         if (!manualTimeInput.value) return;
+        
+        // The input value is a string like "YYYY-MM-DDTHH:mm:ss".
+        // We will treat these components as if they are UTC time.
         const [datePart, timePart] = manualTimeInput.value.split('T');
+        if (!datePart || !timePart) {
+            alert('无效的时间格式');
+            return;
+        }
         const [year, month, day] = datePart.split('-');
-        const formattedTime = `${day}/${month}/${year} ${timePart}:00`;
+        
+        // Construct the DD/MM/YYYY HH:MM:SS string the backend expects.
+        const formattedTime = `${day}/${month}/${year} ${timePart}`;
+
         try {
             const response = await fetch(`/api/data/by-timestamp?time=${encodeURIComponent(formattedTime)}`);
             if (!response.ok) { throw new Error((await response.json()).error); }
@@ -409,6 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await updateDisplay(index, true);
         } catch(error) { alert(`错误: ${error.message}`); }
     }
+    
     function applyFilters() {
         const visibleDevices = new Set();
         document.querySelectorAll('.filter-checkbox:checked').forEach(cb => visibleDevices.add(cb.value));

@@ -12,40 +12,31 @@ let attackData = [];
 
 // --- Time Parsing and Formatting Functions ---
 
-/**
- * Parses a timestamp string from SWaT datasets.
- * Handles both formats: 'DD/MM/YYYY HH:MM:SS AM/PM' and 'DD/MM/YYYY HH:MM:SS' (24-hour).
- * @param {string} ts - The timestamp string.
- * @returns {Date|null} A Date object or null if parsing fails.
- */
 function parseSwatTimestamp(ts) {
     if (!ts || typeof ts !== 'string') { return null; }
     
     const parts = ts.trim().split(' ');
-    if (parts.length < 2) { return null; } // Must have at least date and time parts.
+    if (parts.length < 2) { return null; }
 
     const [datePart, timePart, ampm] = parts;
     const [day, month, year] = datePart.split('/');
 
-    if (!timePart || !year || !month || !day) return null; // Basic validation
+    if (!timePart || !year || !month || !day) return null;
     
     const [hoursStr, minutesStr, secondsStr] = timePart.split(':');
     let hours = parseInt(hoursStr, 10);
 
-    // Handle 12-hour format with AM/PM if present
     if (ampm) {
         if (ampm.toUpperCase() === 'PM' && hours !== 12) {
             hours += 12;
         }
         if (ampm.toUpperCase() === 'AM' && hours === 12) {
-            hours = 0; // Midnight case
+            hours = 0;
         }
     }
-    // If ampm is not present, 'hours' is assumed to be in 24-hour format.
     
     const date = new Date(Date.UTC(year, parseInt(month, 10) - 1, parseInt(day, 10), hours, parseInt(minutesStr, 10), parseInt(secondsStr || 0, 10)));
     
-    // Check if the created date is valid
     if (isNaN(date.getTime())) {
         return null;
     }
@@ -62,12 +53,10 @@ function parseAttackTimes(row) {
     const startTime = parseSwatTimestamp(startTimeStr);
     if (!startTime) return { startTime: null, endTime: null };
 
-    // The end time in the CSV is just a time, so we apply it to the start time's date.
     const [endHours, endMinutes, endSeconds] = endTimeStr.split(':');
     let endTime = new Date(startTime);
     endTime.setUTCHours(endHours, endMinutes, endSeconds, 0);
 
-    // If end time is earlier than start time, it's on the next day.
     if (endTime < startTime) {
         endTime.setUTCDate(endTime.getUTCDate() + 1);
     }
@@ -82,7 +71,6 @@ function formatDateForQuery(date) {
     const hours = String(d.getUTCHours()).padStart(2, '0');
     const minutes = String(d.getUTCMinutes()).padStart(2, '0');
     const seconds = String(d.getUTCSeconds()).padStart(2, '0');
-    // This format does not include AM/PM, which is fine because our new parseSwatTimestamp handles it.
     return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
 }
 
@@ -94,7 +82,11 @@ function loadData() {
         .on('data', (row) => {
             const { startTime, endTime } = parseAttackTimes(row);
             if (startTime && endTime) {
-                attackData.push({ startTime, endTime, id: row['Attack #'] || 'N/A', description: row['Attack'] || 'No description', targets: row['Attack Point'] ? row['Attack Point'].split(';').map(p => p.trim().replace('-', '')) : [] });
+                // BUG FIX: Handle multiple attack points and normalize their IDs
+                const targets = row['Attack Point'] 
+                    ? row['Attack Point'].split(/[,;]/).map(p => p.trim().replace(/-/g, '')) 
+                    : [];
+                attackData.push({ startTime, endTime, id: row['Attack #'] || 'N/A', description: row['Attack'] || 'No description', targets: targets });
             }
         })
         .on('end', () => {
@@ -133,8 +125,8 @@ app.get('/api/attacks', (req, res) => {
             description: attack.description,
             startTime: formatDateForQuery(attack.startTime) 
         })).sort((a,b) => {
-            const numA = parseInt(a.id.replace('Attack #', '').trim());
-            const numB = parseInt(b.id.replace('Attack #', '').trim());
+            const numA = parseInt(a.id.replace(/\D/g, ''), 10);
+            const numB = parseInt(b.id.replace(/\D/g, ''), 10);
             return numA - numB;
         });
         res.json(attackList);
@@ -162,13 +154,23 @@ app.get('/api/data/by-timestamp', (req, res) => {
     const targetTime = targetDate.getTime();
     let closestIndex = -1;
     let minDiff = Infinity;
-    swatData.forEach((record, index) => {
-        const diff = Math.abs(record.jsTimestamp.getTime() - targetTime);
+    
+    let low = 0;
+    let high = swatData.length - 1;
+    while(low <= high) {
+        let mid = Math.floor((low + high) / 2);
+        const diff = Math.abs(swatData[mid].jsTimestamp.getTime() - targetTime);
         if (diff < minDiff) {
             minDiff = diff;
-            closestIndex = index;
+            closestIndex = mid;
         }
-    });
+        if (swatData[mid].jsTimestamp.getTime() < targetTime) {
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
+    }
+
     if (closestIndex !== -1) { res.json({ index: closestIndex, timestamp: swatData[closestIndex].Timestamp }); } 
     else { res.status(404).json({ error: 'Could not find a close match for the specified time.' }); }
 });

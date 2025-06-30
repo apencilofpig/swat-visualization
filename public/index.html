@@ -24,13 +24,20 @@
                     <option value="1.5">1.5x</option>
                     <option value="2">2x</option>
                 </select>
+                <!-- NEW: Rewind/Forward buttons -->
+                <button id="rewind-btn" title="快退 30s"><i class="fas fa-backward-step"></i></button>
                 <input type="range" id="time-slider" min="0" value="0" title="时间轴">
+                <button id="forward-btn" title="快进 30s"><i class="fas fa-forward-step"></i></button>
+
                 <span id="timestamp-display">正在加载...</span>
+                
                 <div class="time-input-container">
+                    <!-- NEW: Button to fill current time -->
+                    <button id="fill-current-time-btn" title="使用当前时间"><i class="fa-regular fa-clock"></i></button>
                     <input type="datetime-local" id="manual-time-input" step="1">
                     <button id="jump-to-time-btn" title="跳转到指定时间">跳转</button>
                 </div>
-                <!-- New Attack List Dropdown -->
+
                 <select id="attack-list" title="跳转到攻击">
                     <option value="">选择攻击跳转...</option>
                 </select>
