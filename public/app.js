@@ -145,7 +145,21 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!timestampData) return;
 
             timeSlider.value = index;
-            const displayTime = timestampData.Timestamp.replace(' AM', '').replace(' PM', '');
+
+            // Create a Date object from the ISO string sent by the server
+            const date = new Date(timestampData.jsTimestamp);
+
+            // Format it into DD/MM/YYYY HH:mm:ss (24-hour format)
+            const day = String(date.getUTCDate()).padStart(2, '0');
+            const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Month is 0-indexed
+            const year = date.getUTCFullYear();
+            const hours = String(date.getUTCHours()).padStart(2, '0');
+            const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+            const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+            
+            // Reconstruct the original format but with guaranteed 24-hour time
+            const displayTime = `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+
             timestampDisplay.textContent = displayTime;
             collapsedTimestampEl.textContent = `时间: ${displayTime}`;
             
@@ -269,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 second: 'HH:mm:ss',
                                 minute: 'HH:mm',
                                 hour: 'MMM d, HH:mm',
-                                day: 'MMM d, yyyy',
+                                day: 'MMM d, yy',
                             }
                         },
                         ticks: {
